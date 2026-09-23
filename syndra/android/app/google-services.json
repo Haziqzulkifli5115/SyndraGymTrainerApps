@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "184991413981",
+    "project_id": "syndra-4c237",
+    "storage_bucket": "syndra-4c237.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:184991413981:android:9545a56bf42bdee67b8d34",
+        "android_client_info": {
+          "package_name": "com.example.syndra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFoAPAUDcWwyp_PMQtgbJtlqce8fk1rSY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
