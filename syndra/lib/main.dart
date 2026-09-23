@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'firebase_options.dart';
-import 'features/auth/presentation/signup_screen.dart';
+import 'features/auth/presentation/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +23,7 @@ class SyndraApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6C5CE7)),
         useMaterial3: true,
       ),
-      home: const SignupScreen(),
+      home: const AuthGate(),
     );
   }
 }

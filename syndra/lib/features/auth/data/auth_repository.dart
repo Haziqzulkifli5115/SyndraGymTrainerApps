@@ -5,14 +5,16 @@ class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// Create a new account with a role.
+  User? get currentUser => _auth.currentUser;
+
+  Stream<User?> authStateChanges() => _auth.authStateChanges();
+
   Future<UserCredential> signUp({
     required String email,
     required String password,
     required String name,
-    required String role, // 'trainer' or 'trainee'
+    required String role,
   }) async {
-    // 1. Create Firebase Auth user
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
@@ -20,7 +22,6 @@ class AuthRepository {
 
     final uid = credential.user!.uid;
 
-    // 2. Save profile in Firestore with role
     await _firestore.collection('users').doc(uid).set({
       'name': name.trim(),
       'email': email.trim(),
@@ -31,19 +32,21 @@ class AuthRepository {
     return credential;
   }
 
-  /// Log in an existing user.
   Future<UserCredential> signIn({
     required String email,
     required String password,
-  }) async {
+  }) {
     return _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
   }
 
-  /// Log out.
-  Future<void> signOut() async {
-    await _auth.signOut();
+  Future<void> signOut() => _auth.signOut();
+
+  /// Fetch a user's Firestore profile by uid.
+  Future<Map<String, dynamic>?> getUserProfile(String uid) async {
+    final doc = await _firestore.collection('users').doc(uid).get();
+    return doc.data();
   }
 }
