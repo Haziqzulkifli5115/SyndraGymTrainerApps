@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../data/auth_repository.dart';
 import '../data/user_provider.dart';
+import '../../../core/utils/invite_code.dart';
 
 class TrainerDashboard extends ConsumerWidget {
   const TrainerDashboard({super.key});
@@ -27,8 +30,21 @@ class TrainerDashboard extends ConsumerWidget {
           if (data == null) {
             return const Center(child: Text('Profile not found'));
           }
+
+          // Backfill: trainer from before the invite-code feature.
+          if (data['inviteCode'] == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              final newCode = InviteCode.generate();
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(FirebaseAuth.instance.currentUser!.uid)
+                  .update({'inviteCode': newCode});
+            });
+          }
+
           final name = data['name'] ?? 'Coach';
           final code = data['inviteCode'] ?? '—';
+          final traineesAsync = ref.watch(trainerTraineesProvider);
 
           return ListView(
             padding: const EdgeInsets.all(24),
@@ -43,6 +59,8 @@ class TrainerDashboard extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 24),
+
+              // Invite code card
               Card(
                 elevation: 4,
                 child: Padding(
@@ -66,36 +84,97 @@ class TrainerDashboard extends ConsumerWidget {
                           letterSpacing: 4,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: () {
-                          // Copy to clipboard
-                          // ignore: deprecated_member_use
-                          // (works without extra package)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Code: $code')),
-                          );
-                        },
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Show code'),
-                      ),
                     ],
                   ),
                 ),
               ),
+
               const SizedBox(height: 32),
               const Divider(),
               const SizedBox(height: 16),
-              const Text(
-                'Your trainees',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+              Row(
+                children: [
+                  const Icon(Icons.people_outline),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Your Trainees',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  traineesAsync.maybeWhen(
+                    data: (list) => Text(
+                      '${list.length}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Coming next: list of linked trainees + approve their logs.',
-                style: TextStyle(color: Colors.grey),
+              const SizedBox(height: 12),
+
+              traineesAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Error loading trainees: $e'),
+                ),
+                data: (trainees) {
+                  if (trainees.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'No trainees linked yet. Share your code above.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: trainees
+                        .map((t) => _TraineeCard(trainee: t))
+                        .toList(),
+                  );
+                },
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TraineeCard extends StatelessWidget {
+  final Map<String, dynamic> trainee;
+  const _TraineeCard({required this.trainee});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = trainee['name'] ?? 'Unnamed';
+    final email = trainee['email'] ?? '';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          child: Text(
+            name.toString().isNotEmpty
+                ? name.toString()[0].toUpperCase()
+                : '?',
+          ),
+        ),
+        title: Text(name),
+        subtitle: Text(email),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Trainee profile: $name (coming soon)')),
           );
         },
       ),
