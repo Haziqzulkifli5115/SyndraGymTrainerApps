@@ -19,9 +19,8 @@ final userProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
       .map((doc) => doc.data());
 });
 
- /// Streams the list of trainees linked to the current trainer.
-final trainerTraineesProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
+/// Streams the list of trainees linked to the current trainer.
+final trainerTraineesProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null) return Stream.value(const []);
 
@@ -30,7 +29,6 @@ final trainerTraineesProvider =
       .where('role', isEqualTo: 'trainee')
       .where('trainerId', isEqualTo: user.uid)
       .snapshots()
-      .map((snap) => snap.docs
-          .map((d) => {'uid': d.id, ...d.data()})
-          .toList());
+      .map((snap) =>
+          snap.docs.map((d) => {'uid': d.id, ...d.data()}).toList());
 });

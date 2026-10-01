@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../data/auth_repository.dart';
 import '../data/user_provider.dart';
 import '../../../core/utils/invite_code.dart';
+import '../../trainer/programs/data/program.dart';
+import '../../trainer/programs/data/program_repository.dart';
+import '../../trainer/programs/presentation/program_builder_screen.dart';
 
 class TrainerDashboard extends ConsumerWidget {
   const TrainerDashboard({super.key});
@@ -45,6 +49,7 @@ class TrainerDashboard extends ConsumerWidget {
           final name = data['name'] ?? 'Coach';
           final code = data['inviteCode'] ?? '—';
           final traineesAsync = ref.watch(trainerTraineesProvider);
+          final trainerId = FirebaseAuth.instance.currentUser!.uid;
 
           return ListView(
             padding: const EdgeInsets.all(24),
@@ -93,6 +98,7 @@ class TrainerDashboard extends ConsumerWidget {
               const Divider(),
               const SizedBox(height: 16),
 
+              // Trainees section
               Row(
                 children: [
                   const Icon(Icons.people_outline),
@@ -142,6 +148,59 @@ class TrainerDashboard extends ConsumerWidget {
                   );
                 },
               ),
+
+              const SizedBox(height: 32),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Programs section
+              Row(
+                children: [
+                  const Icon(Icons.fitness_center),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Your Programs',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProgramBuilderScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('New'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              ref.watch(programsProvider(trainerId)).when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (e, _) => Text('Error loading programs: $e'),
+                    data: (programs) {
+                      if (programs.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                            'No programs yet. Tap "New" to create one.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
+                      return Column(
+                        children: programs
+                            .map((p) => _ProgramCard(program: p))
+                            .toList(),
+                      );
+                    },
+                  ),
+
+              const SizedBox(height: 32),
             ],
           );
         },
@@ -181,3 +240,58 @@ class _TraineeCard extends StatelessWidget {
     );
   }
 }
+
+class _ProgramCard extends StatelessWidget {
+  final Program program;
+  const _ProgramCard({required this.program});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: const Icon(Icons.list_alt),
+        title: Text(program.name),
+        subtitle: Text(
+          '${program.exercises.length} exercise${program.exercises.length == 1 ? '' : 's'}',
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline),
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Delete program?'),
+                content: Text('Delete "${program.name}"?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              await ProgramRepository().deleteProgram(program.id);
+            }
+          },
+        ),
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Program details: ${program.name}')),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Streams the trainer's programs.
+final programsProvider =
+    StreamProvider.family<List<Program>, String>((ref, trainerId) {
+  return ProgramRepository().streamTrainerPrograms(trainerId);
+});
