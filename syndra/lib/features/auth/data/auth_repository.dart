@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/utils/invite_code.dart';
 
 class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   User? get currentUser => _auth.currentUser;
-
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
   Future<UserCredential> signUp({
@@ -22,13 +22,24 @@ class AuthRepository {
 
     final uid = credential.user!.uid;
 
-    await _firestore.collection('users').doc(uid).set({
+    final data = <String, dynamic>{
       'name': name.trim(),
       'email': email.trim(),
       'role': role,
       'createdAt': FieldValue.serverTimestamp(),
-    });
+    };
 
+    // Trainer gets a unique invite code at signup.
+    if (role == 'trainer') {
+      data['inviteCode'] = InviteCode.generate();
+    }
+
+    // Trainee has trainerId = null until they link.
+    if (role == 'trainee') {
+      data['trainerId'] = null;
+    }
+
+    await _firestore.collection('users').doc(uid).set(data);
     return credential;
   }
 
@@ -44,9 +55,38 @@ class AuthRepository {
 
   Future<void> signOut() => _auth.signOut();
 
-  /// Fetch a user's Firestore profile by uid.
   Future<Map<String, dynamic>?> getUserProfile(String uid) async {
     final doc = await _firestore.collection('users').doc(uid).get();
     return doc.data();
+  }
+
+  /// Trainer: find the trainee-visible info for a given invite code.
+  Future<Map<String, dynamic>?> findTrainerByCode(String code) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .where('role', isEqualTo: 'trainer')
+        .where('inviteCode', isEqualTo: code.trim().toUpperCase())
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+    return {'uid': snapshot.docs.first.id, ...snapshot.docs.first.data()};
+  }
+
+  /// Trainee: link to trainer.
+  Future<void> linkTraineeToTrainer({
+    required String traineeId,
+    required String trainerId,
+  }) async {
+    await _firestore.collection('users').doc(traineeId).update({
+      'trainerId': trainerId,
+    });
+  }
+
+  /// Trainee: unlink from trainer.
+  Future<void> unlinkTrainee(String traineeId) async {
+    await _firestore.collection('users').doc(traineeId).update({
+      'trainerId': null,
+    });
   }
 }
