@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import '../data/program.dart';
+import '../../../trainee/workout_log/presentation/workout_logger_screen.dart';
 
 class ProgramDetailScreen extends StatelessWidget {
   final Program program;
   const ProgramDetailScreen({super.key, required this.program});
+
+  Future<bool> _isTrainee() async {
+    // Trainer sees read-only; trainee sees Start Workout button.
+    // We detect by checking if the current user has a linked trainer.
+    // (Simple heuristic — could be role-based, but this works.)
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    // Trainer created this program
+    return program.trainerId != uid;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +30,22 @@ class ProgramDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           for (final ex in program.exercises) _ExerciseCard(exercise: ex),
+          const SizedBox(height: 32),
+          FutureBuilder<bool>(
+            future: _isTrainee(),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => WorkoutLoggerScreen(program: program),
+                  ),
+                ),
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Start Workout'),
+              );
+            },
+          ),
         ],
       ),
     );

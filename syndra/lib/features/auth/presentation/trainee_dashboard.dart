@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../data/auth_repository.dart';
 import '../data/user_provider.dart';
 import 'link_trainer_screen.dart';
+
 import '../../trainer/programs/data/program.dart';
 import '../../trainer/programs/presentation/program_detail_screen.dart';
+
+import '../../trainee/workout_log/data/workout_log.dart';
+import '../../trainee/workout_log/data/workout_log_repository.dart';
 
 class TraineeDashboard extends ConsumerWidget {
   const TraineeDashboard({super.key});
@@ -12,6 +18,7 @@ class TraineeDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(userProfileProvider);
+    final uid = FirebaseAuth.instance.currentUser!.uid;
 
     return Scaffold(
       appBar: AppBar(
@@ -43,7 +50,7 @@ class TraineeDashboard extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // Not-linked banner
+              // ---------- Linked / not-linked banner ----------
               if (!isLinked)
                 Card(
                   color: Colors.orange.shade50,
@@ -101,7 +108,7 @@ class TraineeDashboard extends ConsumerWidget {
               const Divider(),
               const SizedBox(height: 16),
 
-              // Programs section
+              // ---------- Programs ----------
               const Row(
                 children: [
                   Icon(Icons.fitness_center),
@@ -151,15 +158,61 @@ class TraineeDashboard extends ConsumerWidget {
               const Divider(),
               const SizedBox(height: 16),
 
-              const Text(
-                "Today's workout",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              // ---------- Recent logs ----------
+              const Row(
+                children: [
+                  Icon(Icons.history),
+                  SizedBox(width: 8),
+                  Text(
+                    'Your Recent Logs',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Coming next: log your sets, reps, and weight.',
-                style: TextStyle(color: Colors.grey),
-              ),
+              const SizedBox(height: 12),
+
+              ref.watch(myLogsProvider(uid)).when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (e, _) => Text('Error loading logs: $e'),
+                    data: (logs) {
+                      if (logs.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                            'No workouts logged yet.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
+                      return Column(
+                        children: logs.map((log) {
+                          final color = log.status == 'approved'
+                              ? Colors.green
+                              : log.status == 'rejected'
+                                  ? Colors.red
+                                  : Colors.orange;
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading:
+                                  Icon(Icons.fitness_center, color: color),
+                              title: Text(log.programName),
+                              subtitle: Text(
+                                '${log.date.day}/${log.date.month} · '
+                                '${log.status.toUpperCase()}'
+                                '${log.trainerComment != null ? ' — "${log.trainerComment}"' : ''}',
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+
+              const SizedBox(height: 32),
             ],
           );
         },
@@ -167,6 +220,8 @@ class TraineeDashboard extends ConsumerWidget {
     );
   }
 }
+
+// ---------- Helpers ----------
 
 class _ProgramCard extends StatelessWidget {
   final Program program;
@@ -192,3 +247,9 @@ class _ProgramCard extends StatelessWidget {
     );
   }
 }
+
+/// Streams this trainee's workout logs.
+final myLogsProvider =
+    StreamProvider.family<List<WorkoutLog>, String>((ref, traineeId) {
+  return WorkoutLogRepository().streamTraineeLogs(traineeId);
+});

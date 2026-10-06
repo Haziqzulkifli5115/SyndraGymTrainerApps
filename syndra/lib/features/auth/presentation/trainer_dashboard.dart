@@ -12,6 +12,10 @@ import '../../trainer/programs/presentation/program_builder_screen.dart';
 
 import '../../trainer/programs/presentation/program_detail_screen.dart';
 
+import '../../trainee/workout_log/data/workout_log.dart';
+import '../../trainee/workout_log/data/workout_log_repository.dart';
+import '../../trainee/workout_log/presentation/pending_approvals_screen.dart';
+
 class TrainerDashboard extends ConsumerWidget {
   const TrainerDashboard({super.key});
 
@@ -50,9 +54,11 @@ class TrainerDashboard extends ConsumerWidget {
 
           final name = data['name'] ?? 'Coach';
           final code = data['inviteCode'] ?? '—';
-          final traineesAsync = ref.watch(trainerTraineesProvider);
           final trainerId = FirebaseAuth.instance.currentUser!.uid;
-
+          final traineesAsync = ref.watch(trainerTraineesProvider);
+          final pendingAsync = ref.watch(pendingLogsProvider(trainerId));
+          
+          
           return ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -98,7 +104,33 @@ class TrainerDashboard extends ConsumerWidget {
 
               const SizedBox(height: 32),
               const Divider(),
-              const SizedBox(height: 16),
+
+              // Pending approvals card
+              pendingAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (e, _) => const SizedBox.shrink(),
+                data: (logs) {
+                  if (logs.isEmpty) return const SizedBox.shrink();
+                  return Card(
+                    color: Colors.orange.shade50,
+                    child: ListTile(
+                      leading: const Icon(Icons.assignment_turned_in, color: Colors.orange),
+                      title: Text(
+                        '${logs.length} pending workout log${logs.length == 1 ? '' : 's'}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text('Tap to review'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const PendingApprovalsScreen(),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+const SizedBox(height: 16),
 
               // Trainees section
               Row(
@@ -298,4 +330,9 @@ final programsProvider = StreamProvider.family<List<Program>, String>((
   trainerId,
 ) {
   return ProgramRepository().streamTrainerPrograms(trainerId);
+});
+
+final pendingLogsProvider =
+    StreamProvider.family<List<WorkoutLog>, String>((ref, trainerId) {
+  return WorkoutLogRepository().streamPendingLogsForTrainer(trainerId);
 });
