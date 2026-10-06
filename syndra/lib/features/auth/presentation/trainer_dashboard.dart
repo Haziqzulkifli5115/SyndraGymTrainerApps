@@ -10,6 +10,8 @@ import '../../trainer/programs/data/program.dart';
 import '../../trainer/programs/data/program_repository.dart';
 import '../../trainer/programs/presentation/program_builder_screen.dart';
 
+import '../../trainer/programs/presentation/program_detail_screen.dart';
+
 class TrainerDashboard extends ConsumerWidget {
   const TrainerDashboard({super.key});
 
@@ -176,7 +178,9 @@ class TrainerDashboard extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
 
-              ref.watch(programsProvider(trainerId)).when(
+              ref
+                  .watch(programsProvider(trainerId))
+                  .when(
                     loading: () => const Padding(
                       padding: EdgeInsets.all(24),
                       child: Center(child: CircularProgressIndicator()),
@@ -223,9 +227,7 @@ class _TraineeCard extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           child: Text(
-            name.toString().isNotEmpty
-                ? name.toString()[0].toUpperCase()
-                : '?',
+            name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?',
           ),
         ),
         title: Text(name),
@@ -280,18 +282,20 @@ class _ProgramCard extends StatelessWidget {
             }
           },
         ),
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Program details: ${program.name}')),
-          );
-        },
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ProgramDetailScreen(program: program),
+          ),
+        ),
       ),
     );
   }
 }
 
 /// Streams the trainer's programs.
-final programsProvider =
-    StreamProvider.family<List<Program>, String>((ref, trainerId) {
+final programsProvider = StreamProvider.family<List<Program>, String>((
+  ref,
+  trainerId,
+) {
   return ProgramRepository().streamTrainerPrograms(trainerId);
 });
